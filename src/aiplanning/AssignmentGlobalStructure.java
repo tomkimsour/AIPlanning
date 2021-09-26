@@ -44,7 +44,9 @@ public class AssignmentGlobalStructure {
 		Set<Point> boxPoints = generateBoxPoints(inputFile);
 		Point start = getStart(inputFile);
 		ObstacleMap om = generateObstacleMap(inputFile);
-
+		for (Point obstaclePos : om.getObstacles()) {
+			System.out.println("Obstacle at position: " + obstaclePos.x + ", " + obstaclePos.y);
+		}
 
 		//A bit of free visualisation, for you to better see the map!
 		MapDisplayer md = MapDisplayer.newInstance(om);
@@ -63,7 +65,7 @@ public class AssignmentGlobalStructure {
 
 		WorldModel<State, Action> wm = generateWorldModel(om, goalPoints);
 
-		System.out.println("Goal Points are: " + goalPoints.toString());
+		System.out.println("Goal Points are: " + goalPoints);
 		System.out.println("Box Points are: " + boxPoints.toString());
 		System.out.println("Player Position is: " + start.toString());
 		System.out.println("Start State is: " + startState.toString());
@@ -73,7 +75,7 @@ public class AssignmentGlobalStructure {
 		// NullPointer here
 		// Because of call to getProbabilityOf() in DiscreteProbabilityDistributionImpl
 		// Probably because we are trying to move into some state which is not valid
-		PlanningOutcome po = Planning.resolve(wm, startState, goalState, 10);
+		PlanningOutcome po = Planning.resolve(wm, startState, goalState, 50);
 
 
 		/**
@@ -171,7 +173,18 @@ public class AssignmentGlobalStructure {
 
 	private static boolean canMoveTo(Point newPosition, ObstacleMap om, SokobanState state) {
 		Set<Point> obstaclePositions = om.getObstacles();
-		return (!(obstaclePositions.contains(newPosition)) && (!state.boxPositions.contains(newPosition)));
+		for (Point obstaclePos : obstaclePositions) {
+			if (obstaclePos.x == newPosition.x && obstaclePos.y == newPosition.y) {
+				return false;
+			}
+		} // Not colliding with an obstacle
+		for (Point boxPoint : state.boxPositions) {
+			if ((boxPoint.x == newPosition.x) && (boxPoint.y == newPosition.y)) {
+				return false;
+			}
+		} // Not colliding with a box
+
+		return true;
 	}
 
 
@@ -192,7 +205,6 @@ public class AssignmentGlobalStructure {
 					Set<Action> actions = new HashSet<>();
 					actions.add(PathPlanningAction.HALT);
 					Point playerPosition = state_.playerPosition;
-
 
 					if (canMoveTo(new Point(playerPosition.x + 1, playerPosition.y), om, state_)) {
 						actions.add(PathPlanningAction.RIGHT);
@@ -218,19 +230,24 @@ public class AssignmentGlobalStructure {
 			// A bit ugly with casting
 			SokobanState sokobanState = (SokobanState) s;
 			PathPlanningAction pathPlanningAction = (PathPlanningAction) a;
-			sokobanState.carryOutAction(sokobanState, pathPlanningAction);
+			sokobanState.carryOutAction(pathPlanningAction);
 			return sokobanState;
 		};
 
 
 		// Makes (pretty valid) assumption that number of boxes matches number of goal positions
 		Set<State> states = generateAllStates(om, goalPositions, goalPositions.size());
+		System.out.println("All possible states are: ");
+		for (State state : states) {
+			System.out.println(state);
+		}
 
 
 		BiFunction<State, Action, Double> reward = (s, a) -> {
 			SokobanState state = (SokobanState) s;
 			PathPlanningAction action = (PathPlanningAction) a;
-			if (state.carryOutAction(state, action).boxDistances() < state.boxDistances()) {
+			// TODO: This call to carryOutAction might be the issue
+			if (state.carryOutAction(action).boxDistances() < state.boxDistances()) {
 				return 1.0;
 			} else if (state.isGoal()) {
 				return 10.0; // Want to be in goal state
@@ -257,8 +274,6 @@ public class AssignmentGlobalStructure {
 			for (Set<Point> boxPositions : possibleBoxPositions) {
 				if (!boxPositions.contains(playerPosition)) { // Only add valid states where player is not in box
 					sokobanStates.add(new SokobanState(playerPosition, boxPositions, goalPositions));
-				} else {
-					System.out.println("Player and box in same position");
 				}
 			}
 		}
@@ -283,7 +298,7 @@ public class AssignmentGlobalStructure {
 
 	private static List<Point> generateAllPlayerPositions(ObstacleMap om) {
 		List<Point> playerPositions = new ArrayList<>();
-		for (int row = 0; row < om.getHeight() - 1; row++) {
+		for (int row = 0; row < om.getHeight(); row++) {
 			for (int col = 0; col < om.getWidth(); col++) {
 				if (!om.getObstacles().contains(new Point(col, row))) {
 					playerPositions.add(new Point(col, row));

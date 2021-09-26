@@ -24,17 +24,23 @@ public class SokobanState implements State {
         System.out.println("Invalid state: " + this.isInvalid());
     }
 
+    // TODO: Can't get enough redundant checks :^)
     public void moveBox(Point from, Point to) {
         System.out.println("boxPositions.contains() box we want to move: " + boxPositions.contains(from));
         // TODO: Make sure we cannot move boxes into each other
         System.out.println("boxPositions.contains() position we want to move to: " + boxPositions.contains(to));
         this.boxPositions.remove(from);
-        this.boxPositions.add(to);
+        if (!this.playerPosition.equals(to)) {
+            this.boxPositions.add(to);
+        }
     }
 
+    // TODO: EVEN MORE REDUNDANCY :)
     public void movePlayer(int xDiff, int yDiff) {
-        this.playerPosition.x += xDiff;
-        this.playerPosition.y += yDiff;
+        Point newPlayerPos = new Point(this.playerPosition.x + xDiff, this.playerPosition.y + yDiff);
+        if (!boxPositions.contains(newPlayerPos)) {
+            this.playerPosition = newPlayerPos;
+        }
     }
 
 
@@ -62,6 +68,7 @@ public class SokobanState implements State {
             possibleActions.add(AssignmentGlobalStructure.PathPlanningAction.PUSH_UP);
         }
 
+        System.out.println("Possible actions in state " + this + " are: " + possibleActions);
         return possibleActions;
     }
 
@@ -74,22 +81,59 @@ public class SokobanState implements State {
         return boxPositions.contains(playerPosition);
     }
 
-    public SokobanState carryOutAction(SokobanState initial, AssignmentGlobalStructure.PathPlanningAction action) {
+    public SokobanState carryOutAction(AssignmentGlobalStructure.PathPlanningAction action) {
         int xDiff = 0;
         int yDiff = 0;
+        boolean moveBox = false;
         switch (action.toString()) {
-            case "RIGHT", "PUSH_RIGHT" -> xDiff = 1;
-            case "LEFT", "PUSH_LEFT" -> xDiff = -1;
-            case "DOWN", "PUSH_DOWN" -> yDiff = 1;
-            case "UP", "PUSH_UP" -> yDiff = -1;
+            // TODO: Lots of redundancy below, probably
+            case "RIGHT" -> {
+                if (!boxPositions.contains(new Point(playerPosition.x + 1, playerPosition.y))) {
+                    xDiff = 1;
+                }
+            }
+            case "LEFT" -> {
+                if (!boxPositions.contains(new Point(playerPosition.x - 1, playerPosition.y))) {
+                    xDiff = -1;
+                }
+            }
+            case "DOWN" -> {
+                if (!boxPositions.contains(new Point(playerPosition.x, playerPosition.y + 1))) {
+                    yDiff = 1;
+                }
+            }
+            case "UP" -> {
+                if (boxPositions.contains(new Point(playerPosition.x, playerPosition.y - 1))) {
+                    yDiff = -1;
+                }
+            }
+            case "PUSH_RIGHT" -> {
+                xDiff = 1;
+                moveBox = true;
+            }
+            case "PUSH_LEFT" -> {
+                xDiff = -1;
+                moveBox = true;
+            }
+            case "PUSH_UP" -> {
+                yDiff = -1;
+                moveBox = true;
+            }
+            case "PUSH_DOWN" -> {
+                yDiff = 1;
+                moveBox = true;
+            }
 
         }
 
-        Point oldPoint = new Point(initial.playerPosition.x + xDiff, initial.playerPosition.y + yDiff);
-        Point newPoint = new Point(initial.playerPosition.x + (2 * xDiff), initial.playerPosition.y + (yDiff * 2));
-        initial.moveBox(oldPoint, newPoint);
-        initial.movePlayer(xDiff, yDiff);
-        return initial;
+        Point oldPoint = new Point(playerPosition.x + xDiff, playerPosition.y + yDiff);
+        Point newPoint = new Point(playerPosition.x + (2 * xDiff), playerPosition.y + (yDiff * 2));
+        // Here we always try to move a box no matter what?
+        if (moveBox) {
+            moveBox(oldPoint, newPoint);
+        }
+        movePlayer(xDiff, yDiff);
+        return this;
     }
 
     // Should the distance be from each box to each goal point?
@@ -136,19 +180,17 @@ public class SokobanState implements State {
 
     // This should probably only take the box- and goal-positions into account, i.e. NOT the player position
     // Makes defining the goal state easier, otherwise we have to care about where the player is at
-    // TODO: Try adding back playerPositions
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         SokobanState that = (SokobanState) o;
-        return Objects.equals(boxPositions, that.boxPositions) && Objects.equals(goalPositions, that.goalPositions);
+        return Objects.equals(playerPosition, that.playerPosition) && Objects.equals(boxPositions, that.boxPositions) && Objects.equals(goalPositions, that.goalPositions);
     }
 
-    // TODO: Maybe add playerPosition here as well, am trying without it
     @Override
     public int hashCode() {
-        return Objects.hash(boxPositions, goalPositions);
+        return Objects.hash(playerPosition, boxPositions, goalPositions);
     }
 
     @Override
