@@ -250,7 +250,6 @@ public class AssignmentGlobalStructure {
 			if (new PathPlanningState(goal.x, goal.y).equals(s)) {
 				return 1.0;
 			}
-
 			return -1.0;
 		};
 
