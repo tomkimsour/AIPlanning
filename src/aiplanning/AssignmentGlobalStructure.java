@@ -39,9 +39,7 @@ public class AssignmentGlobalStructure {
 		 * In this case, this information is: where do we start, where do we end, where are the obstacles.
 		 */
 
-
 		File inputFile = Paths.get(args[0]).toFile();
-		FileFormatter.formatFile(inputFile);
 		Set<Point> goalPoints = generateGoalPoints(inputFile);
 		Set<Point> boxPoints = generateBoxPoints(inputFile);
 		Point start = getStart(inputFile);
@@ -75,7 +73,7 @@ public class AssignmentGlobalStructure {
 		// NullPointer here
 		// Because of call to getProbabilityOf() in DiscreteProbabilityDistributionImpl
 		// Probably because we are trying to move into some state which is not valid
-		PlanningOutcome po = Planning.resolve(wm, startState, goalState, 50);
+		PlanningOutcome po = Planning.resolve(wm, startState, goalState, 10);
 
 
 		/**
@@ -195,8 +193,7 @@ public class AssignmentGlobalStructure {
 					actions.add(PathPlanningAction.HALT);
 					Point playerPosition = state_.playerPosition;
 
-					// THIS DOES NOT CHECK FOR BOXES!!!
-					// Allows us to move inside boxes, which we don't want to do
+
 					if (canMoveTo(new Point(playerPosition.x + 1, playerPosition.y), om, state_)) {
 						actions.add(PathPlanningAction.RIGHT);
 					}
@@ -212,48 +209,16 @@ public class AssignmentGlobalStructure {
 
 					// This should be fine
 					actions.addAll(state_.getPossibleActions(om));
-
+					System.out.println("Actions are: " + actions + "in state: " + state_);
 					return actions;
 				};
 
 		// Move player and boxes by altering the existing state
 		BiFunction<State, Action, State> transition = (s, a) -> {
-			// TODO: Utilize method in SokobanState for this
+			// A bit ugly with casting
 			SokobanState sokobanState = (SokobanState) s;
-			int xDiff = 0;
-			int yDiff = 0;
-			switch (a.toString()) {
-				case "RIGHT" -> xDiff = 1;
-				case "LEFT" -> xDiff = -1;
-				case "DOWN" -> yDiff = 1;
-				case "UP" -> yDiff = -1;
-				case "PUSH_RIGHT" -> {
-					xDiff = 1;
-					Point oldPoint = new Point(sokobanState.playerPosition.x + xDiff, sokobanState.playerPosition.y);
-					Point newPoint = new Point(sokobanState.playerPosition.x + (xDiff * 2), sokobanState.playerPosition.y);
-					sokobanState.moveBox(oldPoint, newPoint);
-				}
-				case "PUSH_LEFT" -> {
-					xDiff = -1;
-					Point oldPoint = new Point(sokobanState.playerPosition.x + xDiff, sokobanState.playerPosition.y);
-					Point newPoint = new Point(sokobanState.playerPosition.x + (xDiff * 2), sokobanState.playerPosition.y);
-					sokobanState.moveBox(oldPoint, newPoint);
-				}
-				case "PUSH_UP" -> {
-					yDiff = -1;
-					Point oldPoint = new Point(sokobanState.playerPosition.x, sokobanState.playerPosition.y + yDiff);
-					Point newPoint = new Point(sokobanState.playerPosition.x, sokobanState.playerPosition.y + (yDiff * 2));
-					sokobanState.moveBox(oldPoint, newPoint);
-				}
-				case "PUSH_DOWN" -> {
-					yDiff = 1;
-					Point oldPoint = new Point(sokobanState.playerPosition.x, sokobanState.playerPosition.y + yDiff);
-					Point newPoint = new Point(sokobanState.playerPosition.x, sokobanState.playerPosition.y + (yDiff * 2));
-					sokobanState.moveBox(oldPoint, newPoint);
-				}
-			}
-
-			sokobanState.movePlayer(xDiff, yDiff);
+			PathPlanningAction pathPlanningAction = (PathPlanningAction) a;
+			sokobanState.carryOutAction(sokobanState, pathPlanningAction);
 			return sokobanState;
 		};
 
@@ -283,8 +248,7 @@ public class AssignmentGlobalStructure {
 
 	}
 
-	// Need to know number of boxes and the positions of the goal points
-	// But we also might not need to include the goal positions in the state, as they do not change
+
 	private static Set<State> generateAllStates(ObstacleMap om, Set<Point> goalPositions, int boxes) {
 		List<Point> playerPositions = generateAllPlayerPositions(om);
 		Set<Set<Point>> possibleBoxPositions = generateAllBoxPositions(om, boxes);
@@ -293,6 +257,8 @@ public class AssignmentGlobalStructure {
 			for (Set<Point> boxPositions : possibleBoxPositions) {
 				if (!boxPositions.contains(playerPosition)) { // Only add valid states where player is not in box
 					sokobanStates.add(new SokobanState(playerPosition, boxPositions, goalPositions));
+				} else {
+					System.out.println("Player and box in same position");
 				}
 			}
 		}

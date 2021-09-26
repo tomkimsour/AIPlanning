@@ -46,7 +46,7 @@ public class SokobanState implements State {
         Set<Action> possibleActions = new HashSet<>();
         // TODO: THIS IS REALLY UGLY, BUT CHECK IF IT WORKS FIRST
         if (boxPositions.contains(new Point(x + 1, y)) && (!boxPositions.contains(new Point(x + 2, y))) &&
-                !obstacles.contains(new Point(x + 2, y))) {
+                (!obstacles.contains(new Point(x + 2, y)))) {
             possibleActions.add(AssignmentGlobalStructure.PathPlanningAction.PUSH_RIGHT);
         }
         if (boxPositions.contains(new Point(x - 1, y)) && (!boxPositions.contains(new Point(x - 2, y))) &&
@@ -75,40 +75,19 @@ public class SokobanState implements State {
     }
 
     public SokobanState carryOutAction(SokobanState initial, AssignmentGlobalStructure.PathPlanningAction action) {
-        // TODO: Use this in AssignmentGlobalStructure
         int xDiff = 0;
         int yDiff = 0;
         switch (action.toString()) {
-            case "RIGHT" -> xDiff = 1;
-            case "LEFT" -> xDiff = -1;
-            case "DOWN" -> yDiff = 1;
-            case "UP" -> yDiff = -1;
-            case "PUSH_RIGHT" -> {
-                xDiff = 1;
-                Point oldPoint = new Point(initial.playerPosition.x + xDiff, initial.playerPosition.y);
-                Point newPoint = new Point(initial.playerPosition.x + (xDiff * 2), initial.playerPosition.y);
-                initial.moveBox(oldPoint, newPoint); // Should this really be playerPosition???? NO!
-            }
-            case "PUSH_LEFT" -> {
-                xDiff = -1;
-                Point oldPoint = new Point(initial.playerPosition.x + xDiff, initial.playerPosition.y);
-                Point newPoint = new Point(initial.playerPosition.x + (xDiff * 2), initial.playerPosition.y);
-                initial.moveBox(oldPoint, newPoint);
-            }
-            case "PUSH_UP" -> {
-                yDiff = -1;
-                Point oldPoint = new Point(initial.playerPosition.x, initial.playerPosition.y + yDiff);
-                Point newPoint = new Point(initial.playerPosition.x, initial.playerPosition.y + (yDiff * 2));
-                initial.moveBox(oldPoint, newPoint);
-            }
-            case "PUSH_DOWN" -> {
-                yDiff = 1;
-                Point oldPoint = new Point(initial.playerPosition.x, initial.playerPosition.y + yDiff);
-                Point newPoint = new Point(initial.playerPosition.x, initial.playerPosition.y + (yDiff * 2));
-                initial.moveBox(oldPoint, newPoint);
-            }
+            case "RIGHT", "PUSH_RIGHT" -> xDiff = 1;
+            case "LEFT", "PUSH_LEFT" -> xDiff = -1;
+            case "DOWN", "PUSH_DOWN" -> yDiff = 1;
+            case "UP", "PUSH_UP" -> yDiff = -1;
+
         }
 
+        Point oldPoint = new Point(initial.playerPosition.x + xDiff, initial.playerPosition.y + yDiff);
+        Point newPoint = new Point(initial.playerPosition.x + (2 * xDiff), initial.playerPosition.y + (yDiff * 2));
+        initial.moveBox(oldPoint, newPoint);
         initial.movePlayer(xDiff, yDiff);
         return initial;
     }
