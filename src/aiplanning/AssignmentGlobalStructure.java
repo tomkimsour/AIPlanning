@@ -2,14 +2,12 @@ package aiplanning;
 
 import java.awt.Point;
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.cert.PKIXCertPathBuilderResult;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -30,9 +28,8 @@ import obstaclemaps.Path;
 
 public class AssignmentGlobalStructure {
 
-	//TODO: Fix bug that requires all lines in the read file to be the same length
-	private enum PathPlanningAction implements Action {
-		UP, DOWN, LEFT, RIGHT, HALT
+	public enum PathPlanningAction implements Action {
+		UP, DOWN, LEFT, RIGHT, HALT, PUSH_UP, PUSH_DOWN, PUSH_RIGHT, PUSH_LEFT
 	}
 
 	public static void main(String[] args) {
@@ -45,8 +42,9 @@ public class AssignmentGlobalStructure {
 
 		File inputFile = Paths.get(args[0]).toFile();
 		FileFormatter.formatFile(inputFile);
+		Set<Point> goalPoints = generateGoalPoints(inputFile);
+		Set<Point> boxPoints = generateBoxPoints(inputFile);
 		Point start = getStart(inputFile);
-		Point goal = getEnd(inputFile);
 		ObstacleMap om = generateObstacleMap(inputFile);
 
 
@@ -55,8 +53,9 @@ public class AssignmentGlobalStructure {
 		md.setVisible(true);
 
 
-		State startState = toState(start);
-		State goalState = toState(goal);
+		State startState = toState(start, boxPoints, goalPoints);
+		// Right now saying go back to start, but the player position should be arbitrary
+		State goalState = toState(start, goalPoints, goalPoints); // copy might be unnecessary
 
 		/**
 		 * Second step of the processing pipeline: deciding
@@ -64,14 +63,19 @@ public class AssignmentGlobalStructure {
 		 * structure
 		 */
 
-		System.out.println("Start String State is: " + startState);
-		System.out.println("Goal String State is: " + goalState);
+		WorldModel<State, Action> wm = generateWorldModel(om, goalPoints);
 
-		WorldModel<State, Action> wm = generateWorldModel(om, goal);
+		System.out.println("Goal Points are: " + goalPoints.toString());
+		System.out.println("Box Points are: " + boxPoints.toString());
+		System.out.println("Player Position is: " + start.toString());
+		System.out.println("Start State is: " + startState.toString());
+		System.out.println("Goal State is: " + goalState.toString());
+		System.out.println("World Model is: " + wm.toString());
 
-
-		PlanningOutcome po = Planning.resolve(wm, startState, goalState, 200);
-
+		// NullPointer here
+		// Because of call to getProbabilityOf() in DiscreteProbabilityDistributionImpl
+		// Probably because we are trying to move into some state which is not valid
+		PlanningOutcome po = Planning.resolve(wm, startState, goalState, 50);
 
 
 		/**
@@ -94,98 +98,86 @@ public class AssignmentGlobalStructure {
 		// which are NORTH, SOUTH, EAST, WEST
 		List<Path.Direction> directions = new ArrayList<>();
 		State initialState = plan.getStateActionPairs().get(0).getLeft();
-		System.out.println("Initial state in planning is: " + initialState);
 		PathPlanningState initialPathState = (PathPlanningState) initialState;
 		Point initialPoint = new Point(initialPathState.x, initialPathState.y);
 		for (PairImpl<State, Action> pair : plan.getStateActionPairs()) {
 			PathPlanningAction pathAction = (PathPlanningAction) pair.getRight();
 			directions.add(switch (pathAction) {
-				case DOWN -> Path.Direction.SOUTH;
-				case UP -> Path.Direction.NORTH;
-				case RIGHT -> Path.Direction.EAST;
-				case LEFT -> Path.Direction.WEST;
+				case DOWN, PUSH_DOWN -> Path.Direction.SOUTH;
+				case UP, PUSH_UP -> Path.Direction.NORTH;
+				case RIGHT, PUSH_RIGHT -> Path.Direction.EAST;
+				case LEFT, PUSH_LEFT -> Path.Direction.WEST;
 				case HALT -> null;
 			});
 		}
 		return new Path(initialPoint, directions);
 	}
 
-	private static State toState(Point start) {
-		return new PathPlanningState(start);
+	private static State toState(Point start, Set<Point> boxes, Set<Point> goals) {
+		return new SokobanState(start, boxes, goals);
+	}
+
+	private static Set<Point> generateGoalPoints(File inputFile) {
+		return new HashSet<>(generatePointsForChar(inputFile, '.'));
+	}
+
+	private static Set<Point> generateBoxPoints(File inputFile) {
+		return new HashSet<>(generatePointsForChar(inputFile, '$'));
+	}
+
+	private static Set<Point> generatePointsForChar(File inputFile, char lookFor) {
+		Set<Point> charPoints = new HashSet<>();
+		try {
+			List<String> lines = Files.readAllLines(inputFile.toPath());
+			for (int i = 0; i < lines.size(); i++) {
+				String currentLine = lines.get(i);
+				for (int ii = 0; ii < currentLine.length(); ii++) {
+					if (currentLine.charAt(ii) == lookFor) {
+						charPoints.add(new Point(ii, i));
+					}
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return charPoints;
 	}
 
 	// The input file should probably be read line by line
 	// Gives row number and then column number within each row
 	// Need int width, int height and Set<Point> obstacles
 	private static ObstacleMap generateObstacleMap(File inputFile) {
-		try (BufferedReader reader = new BufferedReader(new FileReader(inputFile))) {
-			Set<Point> obstacles = new HashSet<>();
-			int currentRow = 0;
-			String currentLine;
-			int maxCol = 0;
-			String obstacleCharacters = "#$";
-			while ((currentLine = reader.readLine()) != null) {
-				CharacterIterator iterator = new StringCharacterIterator(currentLine);
-				int currentCol = 0;
-				while (iterator.current() != CharacterIterator.DONE) {
-
-
-					if (obstacleCharacters.indexOf(iterator.current()) >= 0) {
-						obstacles.add(new Point(currentCol, currentRow));
-					}
-
-					currentCol++;
-					if (currentCol > maxCol) {
-						maxCol = currentCol;
-					}
-					iterator.next();
+		Set<Point> wallPoints = generatePointsForChar(inputFile, '#'); // Should the boxes be added to the om?
+		HashSet<Point> points = new HashSet<>(wallPoints);
+		int height = 0;
+		int width = 0;
+		try {
+			List<String> lines = Files.readAllLines(inputFile.toPath());
+			height = lines.size();
+			for (String line : lines) {
+				if (line.length() > width) {
+					width = line.length();
 				}
-				currentRow++;
 			}
-			return ObstacleMap.newInstance(maxCol, currentRow, obstacles);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-
-		throw new Error("To be implemented");
+		return new ObstacleMap(width, height, points);
 	}
 
-	// Same thing here
-	private static Point getEnd(File inputFile) {
-		return getCharacterPosition(inputFile, '.');
-	}
 
 	// And here
 	private static Point getStart(File inputFile) {
-		return getCharacterPosition(inputFile, '@');
+		return new ArrayList<>(generatePointsForChar(inputFile, '@')).get(0);
 	}
 
-	private static Point getCharacterPosition(File inputFile, char character) {
-		try (BufferedReader reader = new BufferedReader(new FileReader(inputFile))) {
-			String currentLine;
-			int currentRow = 0;
-			while ((currentLine = reader.readLine()) != null) {
-				int currentCol = 0;
-				CharacterIterator iterator = new StringCharacterIterator(currentLine);
-
-				while (iterator.current() != CharacterIterator.DONE) {
-					if (iterator.current() == character) {
-						return new Point(currentCol, currentRow); // Should be (x, y)
-					}
-
-					currentCol++;
-					iterator.next();
-				}
-				currentRow++;
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		throw new Error("To be implemented");
+	private static boolean canMoveTo(Point newPosition, ObstacleMap om, SokobanState state) {
+		Set<Point> obstaclePositions = om.getObstacles();
+		return (!(obstaclePositions.contains(newPosition)) && (!state.boxPositions.contains(newPosition)));
 	}
 
 
-	private static WorldModel<State, Action> generateWorldModel(ObstacleMap om, Point goal) {
+	private static WorldModel<State, Action> generateWorldModel(ObstacleMap om, Set<Point> goalPositions) {
 		/**
 		 * This is where you describe your own word model. Checkout deterministicplanning.mains.MainForAiDeveloppers or
 		 * deterministicplanning.mains.MainMinimalItKnowledge for some examples of how to implement such function.
@@ -198,57 +190,85 @@ public class AssignmentGlobalStructure {
 
 		Function<State, Set<Action>> actionsPerState =
 				state -> {
-					PathPlanningState state_ = (PathPlanningState) state;
+					SokobanState state_ = (SokobanState) state;
 					Set<Action> actions = new HashSet<>();
 					actions.add(PathPlanningAction.HALT);
+					Point playerPosition = state_.playerPosition;
 
-					Set<Point> obstaclePositions = om.getObstacles();
-
-					if (!obstaclePositions.contains(new Point(state_.x + 1, state_.y))) {
+					// THIS DOES NOT CHECK FOR BOXES!!!
+					// Allows us to move inside boxes, which we don't want to do
+					if (canMoveTo(new Point(playerPosition.x + 1, playerPosition.y), om, state_)) {
 						actions.add(PathPlanningAction.RIGHT);
 					}
-					if (!obstaclePositions.contains(new Point(state_.x - 1, state_.y))) {
+					if (canMoveTo(new Point(playerPosition.x - 1, playerPosition.y), om, state_)) {
 						actions.add(PathPlanningAction.LEFT);
 					}
-					if (!obstaclePositions.contains(new Point(state_.x, state_.y + 1))) {
+					if (canMoveTo(new Point(playerPosition.x, playerPosition.y + 1), om, state_)) {
 						actions.add(PathPlanningAction.DOWN);
 					}
-					if (!obstaclePositions.contains(new Point(state_.x, state_.y - 1))) {
+					if (canMoveTo(new Point(playerPosition.x, playerPosition.y - 1), om, state_)) {
 						actions.add(PathPlanningAction.UP);
 					}
 
+					// This should be fine
+					actions.addAll(state_.getPossibleActions(om));
 
 					return actions;
 				};
 
+		// Move player and boxes by altering the existing state
 		BiFunction<State, Action, State> transition = (s, a) -> {
-			PathPlanningState state_ = (PathPlanningState) s;
+			// TODO: Utilize method in SokobanState for this
+			SokobanState sokobanState = (SokobanState) s;
+			int xDiff = 0;
+			int yDiff = 0;
+			switch (a.toString()) {
+				case "RIGHT" -> xDiff = 1;
+				case "LEFT" -> xDiff = -1;
+				case "DOWN" -> yDiff = 1;
+				case "UP" -> yDiff = -1;
+				case "PUSH_RIGHT" -> {
+					xDiff = 1;
+					Point oldPoint = new Point(sokobanState.playerPosition.x + xDiff, sokobanState.playerPosition.y);
+					Point newPoint = new Point(sokobanState.playerPosition.x + (xDiff * 2), sokobanState.playerPosition.y);
+					sokobanState.moveBox(oldPoint, newPoint);
+				}
+				case "PUSH_LEFT" -> {
+					xDiff = -1;
+					Point oldPoint = new Point(sokobanState.playerPosition.x + xDiff, sokobanState.playerPosition.y);
+					Point newPoint = new Point(sokobanState.playerPosition.x + (xDiff * 2), sokobanState.playerPosition.y);
+					sokobanState.moveBox(oldPoint, newPoint);
+				}
+				case "PUSH_UP" -> {
+					yDiff = -1;
+					Point oldPoint = new Point(sokobanState.playerPosition.x, sokobanState.playerPosition.y + yDiff);
+					Point newPoint = new Point(sokobanState.playerPosition.x, sokobanState.playerPosition.y + (yDiff * 2));
+					sokobanState.moveBox(oldPoint, newPoint);
+				}
+				case "PUSH_DOWN" -> {
+					yDiff = 1;
+					Point oldPoint = new Point(sokobanState.playerPosition.x, sokobanState.playerPosition.y + yDiff);
+					Point newPoint = new Point(sokobanState.playerPosition.x, sokobanState.playerPosition.y + (yDiff * 2));
+					sokobanState.moveBox(oldPoint, newPoint);
+				}
+			}
 
-
-			return switch (a.toString()) {
-				case "RIGHT" -> new PathPlanningState(state_.x + 1, state_.y);
-				case "LEFT" -> new PathPlanningState(state_.x - 1, state_.y);
-				case "DOWN" -> new PathPlanningState(state_.x, state_.y + 1);
-				case "UP" -> new PathPlanningState(state_.x, state_.y - 1);
-				default -> s;
-			};
+			sokobanState.movePlayer(xDiff, yDiff);
+			return sokobanState;
 		};
 
 
-		Set<State> states = new HashSet<>();
-		for (int row = 0; row < om.getHeight() - 1; row++) {
-			for (int col = 0; col < om.getWidth(); col++) {
-				if (!om.getObstacles().contains(new Point(col, row))) {
-					states.add(new PathPlanningState(col, row));
-				}
-			}
-		}
+		// Makes (pretty valid) assumption that number of boxes matches number of goal positions
+		Set<State> states = generateAllStates(om, goalPositions, goalPositions.size());
 
-		// Need a suitable reward function
-		// Should all moves just have reward -1 so that as few moves as possible is recommended?
+
 		BiFunction<State, Action, Double> reward = (s, a) -> {
-			if (new PathPlanningState(goal.x, goal.y).equals(s)) {
+			SokobanState state = (SokobanState) s;
+			PathPlanningAction action = (PathPlanningAction) a;
+			if (state.carryOutAction(state, action).boxDistances() < state.boxDistances()) {
 				return 1.0;
+			} else if (state.isGoal()) {
+				return 10.0; // Want to be in goal state
 			}
 
 			return -1.0;
@@ -261,6 +281,51 @@ public class AssignmentGlobalStructure {
 				actionsPerState
 		);
 
+	}
+
+	// Need to know number of boxes and the positions of the goal points
+	// But we also might not need to include the goal positions in the state, as they do not change
+	private static Set<State> generateAllStates(ObstacleMap om, Set<Point> goalPositions, int boxes) {
+		List<Point> playerPositions = generateAllPlayerPositions(om);
+		Set<Set<Point>> possibleBoxPositions = generateAllBoxPositions(om, boxes);
+		Set<State> sokobanStates = new HashSet<>();
+		for (Point playerPosition : playerPositions) {
+			for (Set<Point> boxPositions : possibleBoxPositions) {
+				if (!boxPositions.contains(playerPosition)) { // Only add valid states where player is not in box
+					sokobanStates.add(new SokobanState(playerPosition, boxPositions, goalPositions));
+				}
+			}
+		}
+
+		return sokobanStates;
+	}
+
+
+	private static Set<Set<Point>> generateAllBoxPositions(ObstacleMap om, int boxes) {
+		List<Point> openPositions = generateAllPlayerPositions(om);
+		List<int[]> combinations = Combinations.generateIndexes(openPositions.size(), boxes);
+		Set<Set<Point>> pointCombinations = new HashSet<>();
+		for (int[] combination : combinations) {
+			Set<Point> points = new HashSet<>();
+			for (int index : combination) {
+				points.add(openPositions.get(index));
+			}
+			pointCombinations.add(points);
+		}
+		return pointCombinations;
+	}
+
+	private static List<Point> generateAllPlayerPositions(ObstacleMap om) {
+		List<Point> playerPositions = new ArrayList<>();
+		for (int row = 0; row < om.getHeight() - 1; row++) {
+			for (int col = 0; col < om.getWidth(); col++) {
+				if (!om.getObstacles().contains(new Point(col, row))) {
+					playerPositions.add(new Point(col, row));
+				}
+			}
+		}
+
+		return playerPositions;
 	}
 
 }
