@@ -26,6 +26,7 @@ import obstaclemaps.MapDisplayer;
 import obstaclemaps.ObstacleMap;
 import obstaclemaps.Path;
 
+
 public class AssignmentGlobalStructure {
 
 	public enum PathPlanningAction implements Action {
@@ -44,9 +45,6 @@ public class AssignmentGlobalStructure {
 		Set<Point> boxPoints = generateBoxPoints(inputFile);
 		Point start = getStart(inputFile);
 		ObstacleMap om = generateObstacleMap(inputFile);
-		for (Point obstaclePos : om.getObstacles()) {
-			System.out.println("Obstacle at position: " + obstaclePos.x + ", " + obstaclePos.y);
-		}
 
 		//A bit of free visualisation, for you to better see the map!
 		MapDisplayer md = MapDisplayer.newInstance(om);
@@ -56,26 +54,17 @@ public class AssignmentGlobalStructure {
 		State startState = toState(start, boxPoints, goalPoints);
 		// Right now saying go back to start, but the player position should be arbitrary
 		State goalState = toState(start, goalPoints, goalPoints); // copy might be unnecessary
-
 		/**
 		 * Second step of the processing pipeline: deciding
 		 * This step projects the pre-processed sensory input into a decision
 		 * structure
 		 */
 
-		WorldModel<State, Action> wm = generateWorldModel(om, goalPoints);
+		WorldModel<State, Action> wm = generateWorldModel(om, goalPoints, goalState);
 
-		System.out.println("Goal Points are: " + goalPoints);
-		System.out.println("Box Points are: " + boxPoints.toString());
-		System.out.println("Player Position is: " + start.toString());
-		System.out.println("Start State is: " + startState.toString());
-		System.out.println("Goal State is: " + goalState.toString());
-		System.out.println("World Model is: " + wm.toString());
 
-		// NullPointer here
-		// Because of call to getProbabilityOf() in DiscreteProbabilityDistributionImpl
-		// Probably because we are trying to move into some state which is not valid
-		PlanningOutcome po = Planning.resolve(wm, startState, goalState, 50);
+
+		PlanningOutcome po = Planning.resolve(wm, startState, goalState, 2000);
 
 
 		/**
@@ -98,8 +87,8 @@ public class AssignmentGlobalStructure {
 		// which are NORTH, SOUTH, EAST, WEST
 		List<Path.Direction> directions = new ArrayList<>();
 		State initialState = plan.getStateActionPairs().get(0).getLeft();
-		PathPlanningState initialPathState = (PathPlanningState) initialState;
-		Point initialPoint = new Point(initialPathState.x, initialPathState.y);
+		SokobanState initialPathState = (SokobanState) initialState;
+		Point initialPoint = new Point(initialPathState.playerPosition.x, initialPathState.playerPosition.y);
 		for (PairImpl<State, Action> pair : plan.getStateActionPairs()) {
 			PathPlanningAction pathAction = (PathPlanningAction) pair.getRight();
 			directions.add(switch (pathAction) {
@@ -188,7 +177,7 @@ public class AssignmentGlobalStructure {
 	}
 
 
-	private static WorldModel<State, Action> generateWorldModel(ObstacleMap om, Set<Point> goalPositions) {
+	private static WorldModel<State, Action> generateWorldModel(ObstacleMap om, Set<Point> goalPositions, State goalState) {
 		/**
 		 * This is where you describe your own word model. Checkout deterministicplanning.mains.MainForAiDeveloppers or
 		 * deterministicplanning.mains.MainMinimalItKnowledge for some examples of how to implement such function.
@@ -221,7 +210,6 @@ public class AssignmentGlobalStructure {
 
 					// This should be fine
 					actions.addAll(state_.getPossibleActions(om));
-					System.out.println("Actions are: " + actions + "in state: " + state_);
 					return actions;
 				};
 
@@ -230,30 +218,32 @@ public class AssignmentGlobalStructure {
 			// A bit ugly with casting
 			SokobanState sokobanState = (SokobanState) s;
 			PathPlanningAction pathPlanningAction = (PathPlanningAction) a;
-			sokobanState.carryOutAction(pathPlanningAction);
-			return sokobanState;
+			return sokobanState.carryOutAction(pathPlanningAction);
 		};
 
 
 		// Makes (pretty valid) assumption that number of boxes matches number of goal positions
 		Set<State> states = generateAllStates(om, goalPositions, goalPositions.size());
-		System.out.println("All possible states are: ");
+		System.out.println("Total number of states: " + states.size());
 		for (State state : states) {
-			System.out.println(state);
+			SokobanState state_ = (SokobanState) state;
+			if (state_.playerPosition.x == 1 && state_.playerPosition.y == 2) {
+				System.out.println("LOOKING FOR THIS");
+			}
 		}
-
 
 		BiFunction<State, Action, Double> reward = (s, a) -> {
 			SokobanState state = (SokobanState) s;
 			PathPlanningAction action = (PathPlanningAction) a;
-			// TODO: This call to carryOutAction might be the issue
-			if (state.carryOutAction(action).boxDistances() < state.boxDistances()) {
-				return 1.0;
-			} else if (state.isGoal()) {
-				return 10.0; // Want to be in goal state
+			boolean reachesGoal = state.carryOutAction(action).hashCode() == goalState.hashCode();
+			double rewardValue; // TODO: For printing the reward, change to return statements later
+			if (reachesGoal) {
+				rewardValue = 0.0; // Want to be in goal state
+			} else {
+				rewardValue = -1.0;
 			}
 
-			return -1.0;
+			return rewardValue;
 		};
 
 		return FunctionBasedDeterministicWorldModel.newInstance(
@@ -266,6 +256,7 @@ public class AssignmentGlobalStructure {
 	}
 
 
+	// Currently lacks (2,1) (3,1) (3,1) for some reason
 	private static Set<State> generateAllStates(ObstacleMap om, Set<Point> goalPositions, int boxes) {
 		List<Point> playerPositions = generateAllPlayerPositions(om);
 		Set<Set<Point>> possibleBoxPositions = generateAllBoxPositions(om, boxes);
@@ -277,7 +268,6 @@ public class AssignmentGlobalStructure {
 				}
 			}
 		}
-
 		return sokobanStates;
 	}
 
@@ -293,6 +283,11 @@ public class AssignmentGlobalStructure {
 			}
 			pointCombinations.add(points);
 		}
+
+		System.out.println("Possible box positions:");
+		for (Set<Point> points : pointCombinations) {
+			System.out.println(points.toString());
+		}
 		return pointCombinations;
 	}
 
@@ -305,7 +300,7 @@ public class AssignmentGlobalStructure {
 				}
 			}
 		}
-
+		System.out.println("Possible player positions: " + playerPositions);
 		return playerPositions;
 	}
 

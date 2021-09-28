@@ -21,26 +21,17 @@ public class SokobanState implements State {
         this.playerPosition = playerPosition;
         this.boxPositions = boxPositions;
         this.goalPositions = goalPositions;
-        System.out.println("Invalid state: " + this.isInvalid());
     }
 
-    // TODO: Can't get enough redundant checks :^)
-    public void moveBox(Point from, Point to) {
-        System.out.println("boxPositions.contains() box we want to move: " + boxPositions.contains(from));
-        // TODO: Make sure we cannot move boxes into each other
-        System.out.println("boxPositions.contains() position we want to move to: " + boxPositions.contains(to));
-        this.boxPositions.remove(from);
-        if (!this.playerPosition.equals(to)) {
-            this.boxPositions.add(to);
-        }
+    public Set<Point> moveBox(Point from, Point to) {
+        Set<Point> boxes = new HashSet<>(this.boxPositions);
+        boxes.remove(from);
+        boxes.add(to);
+        return boxes;
     }
 
-    // TODO: EVEN MORE REDUNDANCY :)
-    public void movePlayer(int xDiff, int yDiff) {
-        Point newPlayerPos = new Point(this.playerPosition.x + xDiff, this.playerPosition.y + yDiff);
-        if (!boxPositions.contains(newPlayerPos)) {
-            this.playerPosition = newPlayerPos;
-        }
+    public Point movePlayer(int xDiff, int yDiff) {
+        return new Point(this.playerPosition.x + xDiff, this.playerPosition.y + yDiff);
     }
 
 
@@ -68,13 +59,9 @@ public class SokobanState implements State {
             possibleActions.add(AssignmentGlobalStructure.PathPlanningAction.PUSH_UP);
         }
 
-        System.out.println("Possible actions in state " + this + " are: " + possibleActions);
         return possibleActions;
     }
 
-    public boolean isGoal() {
-        return boxPositions.equals(goalPositions);
-    }
 
     // For debugging purposes only, check if box positions contain player position
     private boolean isInvalid() {
@@ -88,24 +75,16 @@ public class SokobanState implements State {
         switch (action.toString()) {
             // TODO: Lots of redundancy below, probably
             case "RIGHT" -> {
-                if (!boxPositions.contains(new Point(playerPosition.x + 1, playerPosition.y))) {
                     xDiff = 1;
-                }
             }
             case "LEFT" -> {
-                if (!boxPositions.contains(new Point(playerPosition.x - 1, playerPosition.y))) {
                     xDiff = -1;
-                }
             }
             case "DOWN" -> {
-                if (!boxPositions.contains(new Point(playerPosition.x, playerPosition.y + 1))) {
                     yDiff = 1;
-                }
             }
             case "UP" -> {
-                if (boxPositions.contains(new Point(playerPosition.x, playerPosition.y - 1))) {
                     yDiff = -1;
-                }
             }
             case "PUSH_RIGHT" -> {
                 xDiff = 1;
@@ -126,14 +105,17 @@ public class SokobanState implements State {
 
         }
 
+        int sum = xDiff + yDiff; // for debugging only
         Point oldPoint = new Point(playerPosition.x + xDiff, playerPosition.y + yDiff);
         Point newPoint = new Point(playerPosition.x + (2 * xDiff), playerPosition.y + (yDiff * 2));
         // Here we always try to move a box no matter what?
+        Point newPlayerPoint = movePlayer(xDiff, yDiff);
         if (moveBox) {
-            moveBox(oldPoint, newPoint);
+            Set<Point> newBoxPoints = moveBox(oldPoint, newPoint);
+            return new SokobanState(newPlayerPoint, newBoxPoints, new HashSet<>(goalPositions));
         }
-        movePlayer(xDiff, yDiff);
-        return this;
+        // TODO: All this copying might be completely unnecessary
+        return new SokobanState(newPlayerPoint, new HashSet<>(boxPositions), new HashSet<>(goalPositions));
     }
 
     // Should the distance be from each box to each goal point?
@@ -185,12 +167,20 @@ public class SokobanState implements State {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         SokobanState that = (SokobanState) o;
-        return Objects.equals(playerPosition, that.playerPosition) && Objects.equals(boxPositions, that.boxPositions) && Objects.equals(goalPositions, that.goalPositions);
+        return this.hashCode() == that.hashCode(); // Worth a shot?
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(playerPosition, boxPositions, goalPositions);
+        // Implementation heavily based on Baeldung article
+        int hash = 13;
+        for (Point box : boxPositions) {
+            hash += 31 * hash + box.x;
+            hash += 31 * hash + box.y;
+        }
+        hash += 31 * playerPosition.x;
+        hash += 31 * playerPosition.y;
+        return hash;
     }
 
     @Override
@@ -199,6 +189,7 @@ public class SokobanState implements State {
                 "playerPosition=" + playerPosition +
                 ", boxPositions=" + boxPositions +
                 ", goalPositions=" + goalPositions +
+                ", hash=" + hashCode() +
                 '}';
     }
 }
