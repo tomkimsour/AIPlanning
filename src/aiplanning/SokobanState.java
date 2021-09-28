@@ -172,15 +172,7 @@ public class SokobanState implements State {
 
     @Override
     public int hashCode() {
-        // Implementation heavily based on Baeldung article
-        int hash = 13;
-        for (Point box : boxPositions) {
-            hash += 31 * hash + box.x;
-            hash += 31 * hash + box.y;
-        }
-        hash += 31 * playerPosition.x;
-        hash += 31 * playerPosition.y;
-        return hash;
+        return Objects.hash(playerPosition, boxPositions, goalPositions);
     }
 
     @Override
