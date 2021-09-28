@@ -62,8 +62,13 @@ public class AssignmentGlobalStructure {
 
         WorldModel<State, Action> wm = generateWorldModel(om, goalPoints, goalState);
 
+        Queue<Action> actionQueue = Solver.resolve(wm, startState, goalState);
+        Path p = planToPath(actionQueue, start);
+        md.setPath(p);
+        System.out.println("Path found: " + p);
 
-        PlanningOutcome po = Planning.resolve(wm, startState, goalState, 1000);
+        // DEFAULT SOLVER
+        //PlanningOutcome po = Planning.resolve(wm, startState, goalState, 1000);
 
 
         /**
@@ -71,6 +76,7 @@ public class AssignmentGlobalStructure {
          * This step turns the outcome of the decision into a concrete action:
          * either printing that no plan is found or which plan is found.
          */
+        /* DEFAULT SOLVER
         if (po instanceof FailedPlanningOutcome) {
             System.out.println("No plan could be found.");
         } else {
@@ -79,26 +85,24 @@ public class AssignmentGlobalStructure {
             md.setPath(p);
             System.out.println("Path found:" + p);
         }
+        */
     }
 
-    private static Path planToPath(Plan<State, Action> plan) {
+    private static Path planToPath(Queue<Action> actionsToTake, Point startingPoint) {
         // A Path needs a starting point and a list of Directions
         // which are NORTH, SOUTH, EAST, WEST
         List<Path.Direction> directions = new ArrayList<>();
-        State initialState = plan.getStateActionPairs().get(0).getLeft();
-        SokobanState initialPathState = (SokobanState) initialState;
-        Point initialPoint = new Point(initialPathState.playerPosition.x, initialPathState.playerPosition.y);
-        for (PairImpl<State, Action> pair : plan.getStateActionPairs()) {
-            PathPlanningAction pathAction = (PathPlanningAction) pair.getRight();
-            directions.add(switch (pathAction) {
+        while (!actionsToTake.isEmpty()) {
+            directions.add(switch ((PathPlanningAction) actionsToTake.remove()) {
                 case DOWN, PUSH_DOWN -> Path.Direction.SOUTH;
+                case HALT -> null; // a bit ugly but that's life :)
                 case UP, PUSH_UP -> Path.Direction.NORTH;
                 case RIGHT, PUSH_RIGHT -> Path.Direction.EAST;
                 case LEFT, PUSH_LEFT -> Path.Direction.WEST;
-                case HALT -> null;
             });
+
         }
-        return new Path(initialPoint, directions);
+        return new Path(startingPoint, directions);
     }
 
     private static State toState(Point start, Set<Point> boxes, Set<Point> goals) {
@@ -227,9 +231,8 @@ public class AssignmentGlobalStructure {
 
         BiFunction<State, Action, Double> reward = (s, a) -> {
             SokobanState state = (SokobanState) s;
-            PathPlanningAction action = (PathPlanningAction) a;
-            if (state.hashCode() == goalState.hashCode()) {
-                return 1.0; // Want to be in goal state
+            if (s.hashCode() == goalState.hashCode()) {
+                return 1000000000.0; // Want to be in goal state
             }
 
             return -1.0;
