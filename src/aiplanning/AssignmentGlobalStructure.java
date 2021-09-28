@@ -4,9 +4,6 @@ import java.awt.Point;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.cert.PKIXCertPathBuilderResult;
-import java.text.CharacterIterator;
-import java.text.StringCharacterIterator;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -14,14 +11,8 @@ import java.util.function.Function;
 import deterministicplanning.models.FunctionBasedDeterministicWorldModel;
 import deterministicplanning.models.Plan;
 import deterministicplanning.models.WorldModel;
-import deterministicplanning.solvers.Planning;
-import deterministicplanning.solvers.planningoutcomes.FailedPlanningOutcome;
-import deterministicplanning.solvers.planningoutcomes.PlanningOutcome;
-import deterministicplanning.solvers.planningoutcomes.SuccessfulPlanningOutcome;
 import finitestatemachine.Action;
 import finitestatemachine.State;
-import finitestatemachine.impl.StringStateImpl;
-import markov.impl.PairImpl;
 import obstaclemaps.MapDisplayer;
 import obstaclemaps.ObstacleMap;
 import obstaclemaps.Path;
@@ -62,8 +53,8 @@ public class AssignmentGlobalStructure {
 
         WorldModel<State, Action> wm = generateWorldModel(om, goalPoints, goalState);
 
-        Queue<Action> actionQueue = Solver.resolve(wm, startState, goalState);
-        Path p = planToPath(actionQueue, start);
+        Stack<Action> actions = Solver.resolve(wm, startState, goalState);
+        Path p = planToPath(actions, start);
         md.setPath(p);
         System.out.println("Path found: " + p);
 
@@ -88,12 +79,12 @@ public class AssignmentGlobalStructure {
         */
     }
 
-    private static Path planToPath(Queue<Action> actionsToTake, Point startingPoint) {
+    private static Path planToPath(Stack<Action> actionsToTake, Point startingPoint) {
         // A Path needs a starting point and a list of Directions
         // which are NORTH, SOUTH, EAST, WEST
         List<Path.Direction> directions = new ArrayList<>();
         while (!actionsToTake.isEmpty()) {
-            directions.add(switch ((PathPlanningAction) actionsToTake.remove()) {
+            directions.add(switch ((PathPlanningAction) actionsToTake.pop()) {
                 case DOWN, PUSH_DOWN -> Path.Direction.SOUTH;
                 case HALT -> null; // a bit ugly but that's life :)
                 case UP, PUSH_UP -> Path.Direction.NORTH;
