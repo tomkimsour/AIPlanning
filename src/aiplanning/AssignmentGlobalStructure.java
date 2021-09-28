@@ -64,7 +64,13 @@ public class AssignmentGlobalStructure {
         WorldModel<State, Action> wm = generateWorldModel(om, goal);
 
         long customStartTime = System.nanoTime();
-        Stack<Action> actions = Solver.resolve(wm, startState, goalState);
+        List<State> states = Solver.resolve(wm, startState, goalState);
+        System.out.println("States are: ");
+        for (State state : states) {
+            System.out.println(state);
+        }
+        /*
+        System.out.println("Actions are: " + actions);
         Path p = planToPath(actions, start);
         md.setPath(p);
         System.out.println("Path found: " + p);
@@ -77,7 +83,7 @@ public class AssignmentGlobalStructure {
         long defaultDuration = (defaultEndTime - defaultStartTime) / 1000000;
         System.out.println("Custom implementation took " + customDuration + " ms");
         System.out.println("Default implementation took " + defaultDuration + " ms");
-
+        */
         /**
          * Third step of the processing pipeline: action
          * This step turns the outcome of the decision into a concrete action:
@@ -95,10 +101,10 @@ public class AssignmentGlobalStructure {
         }*/
     }
 
-    private static Path planToPath(Stack<Action> actions, Point startingPoint) {
+    private static Path planToPath(Queue<Action> actions, Point startingPoint) {
         List<Path.Direction> directions = new ArrayList<>();
-        while (!actions.empty()) {
-            directions.add(switch ((PathPlanningAction)actions.pop()) {
+        for (Action action : actions) {
+            directions.add(switch ((PathPlanningAction) action) {
                 case DOWN -> Path.Direction.SOUTH;
                 case UP -> Path.Direction.NORTH;
                 case LEFT -> Path.Direction.WEST;
@@ -106,7 +112,6 @@ public class AssignmentGlobalStructure {
                 case HALT -> null;
             });
         }
-
 
         return new Path(startingPoint, directions);
     }
