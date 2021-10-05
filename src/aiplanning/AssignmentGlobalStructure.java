@@ -63,34 +63,22 @@ public class AssignmentGlobalStructure {
 
         WorldModel<State, Action> wm = generateWorldModel(om, goal);
 
-        long customStartTime = System.nanoTime();
+
         Stack<Action> actions = Solver.resolve(wm, startState, goalState);
         Path p = planToPath(actions, start);
         md.setPath(p);
-        System.out.println(p);
-        long customEndTime = System.nanoTime();
-        long customDuration = (customEndTime - customStartTime) / 1000000;
+        if (p.getDirections().isEmpty()) {
+            System.out.println("No path could be found.");
+        } else {
+            System.out.println(p);
+        }
 
-        long defaultStartTime = System.nanoTime();
-        PlanningOutcome po = Planning.resolve(wm, startState, goalState, 4000);
-        long defaultEndTime = System.nanoTime();
-        long defaultDuration = (defaultEndTime - defaultStartTime) / 1000000;
 
         /**
          * Third step of the processing pipeline: action
          * This step turns the outcome of the decision into a concrete action:
          * either printing that no plan is found or which plan is found.
          */
-         //FOR USING DEFAULT PLANNER
-        /*
-        if (po instanceof FailedPlanningOutcome) {
-            System.out.println("No plan could be found.");
-        } else {
-            Plan<State, Action> plan = ((SuccessfulPlanningOutcome) po).getPlan();
-            Path p = planToPath(plan);
-            md.setPath(p);
-            System.out.println("Path found:" + p);
-        }*/
     }
 
     private static Path planToPath(Stack<Action> actions, Point startingPoint) {
@@ -107,28 +95,6 @@ public class AssignmentGlobalStructure {
 
 
         return new Path(startingPoint, directions);
-    }
-
-    private static Path planToPath(Plan<State, Action> plan) {
-        // A Path needs a starting point and a list of Directions
-        // which are NORTH, SOUTH, EAST, WEST
-
-        List<Path.Direction> directions = new ArrayList<>();
-        State initialState = plan.getStateActionPairs().get(0).getLeft();
-        System.out.println("Initial state in planning is: " + initialState);
-        PathPlanningState initialPathState = (PathPlanningState) initialState;
-        Point initialPoint = new Point(initialPathState.x, initialPathState.y);
-        for (PairImpl<State, Action> pair : plan.getStateActionPairs()) {
-            PathPlanningAction pathAction = (PathPlanningAction) pair.getRight();
-            directions.add(switch (pathAction) {
-                case DOWN -> Path.Direction.SOUTH;
-                case UP -> Path.Direction.NORTH;
-                case RIGHT -> Path.Direction.EAST;
-                case LEFT -> Path.Direction.WEST;
-                case HALT -> null;
-            });
-        }
-        return new Path(initialPoint, directions);
     }
 
     private static State toState(Point start) {

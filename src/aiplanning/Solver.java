@@ -10,28 +10,24 @@ import java.util.*;
 
 public class Solver {
 
-    // Maybe start with DFS or BFS, so that the complexity is not from the actual algorithm?
-    // maxHorizon might not be necessary depending on what search we use
-    // We want to save the actions somehow, perhaps in a queue?
-    // Then return that and match
+    // Recursively calls helper in order to add actions that lead to the goal in a Stack
+    // The goals are added in the reverse order they should be executed in,
+    // i.e. the action that reaches the goal state is added first.
     public static<S extends State, A extends Action> Stack<Action> resolve(WorldModel<State, Action> wm, S startingState, S goalState) {
         List<State> visited = new ArrayList<>();
         Set<Action> startingActions = wm.getActionsFrom(startingState);
-        Stack<Action> savedActions = new Stack<>(); // TODO: Make sure this is a reasonable choice
-        // How to determine what action to take?
-        // Maybe always take first action?
+        Stack<Action> savedActions = new Stack<>();
         helper(startingState, startingActions, wm, visited, goalState, savedActions);
 
         return savedActions;
     }
 
-    // Will probably need this for recursion
-    // Should use a stack and only add if the goal is found
+
     private static int helper(State state, Set<Action> possibleActions, WorldModel<State, Action> wm, List<State> visited, State goalState, Stack<Action> savedActions) {
         if (state.hashCode() == goalState.hashCode()) { // Have found the goal, don't add more actions
-            return - 1; // This probably does not stop the iteration from continuing in the calling method
+            return - 1;
         }
-        visited.add(state); // Mark state as visited
+        visited.add(state);
         for (Action action : possibleActions) {
             if (!visited.contains(wm.getConsequenceOfPlaying(state, action))) { // Find first non-visited state
                 State newState = wm.getConsequenceOfPlaying(state, action);
