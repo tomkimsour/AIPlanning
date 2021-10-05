@@ -67,7 +67,7 @@ public class AssignmentGlobalStructure {
         Stack<Action> actions = Solver.resolve(wm, startState, goalState);
         Path p = planToPath(actions, start);
         md.setPath(p);
-        System.out.println("Path found: " + p);
+        System.out.println(p);
         long customEndTime = System.nanoTime();
         long customDuration = (customEndTime - customStartTime) / 1000000;
 
@@ -75,8 +75,6 @@ public class AssignmentGlobalStructure {
         PlanningOutcome po = Planning.resolve(wm, startState, goalState, 4000);
         long defaultEndTime = System.nanoTime();
         long defaultDuration = (defaultEndTime - defaultStartTime) / 1000000;
-        System.out.println("Custom implementation took " + customDuration + " ms");
-        System.out.println("Default implementation took " + defaultDuration + " ms");
 
         /**
          * Third step of the processing pipeline: action
