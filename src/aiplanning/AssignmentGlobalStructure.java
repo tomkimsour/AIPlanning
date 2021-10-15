@@ -3,7 +3,6 @@ package aiplanning;
 import java.awt.Point;
 import java.io.*;
 import java.nio.file.Paths;
-import java.security.cert.PKIXCertPathBuilderResult;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.*;
@@ -11,28 +10,20 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import deterministicplanning.models.FunctionBasedDeterministicWorldModel;
-import deterministicplanning.models.Plan;
 import deterministicplanning.models.WorldModel;
-import deterministicplanning.solvers.Planning;
-import deterministicplanning.solvers.planningoutcomes.FailedPlanningOutcome;
-import deterministicplanning.solvers.planningoutcomes.PlanningOutcome;
-import deterministicplanning.solvers.planningoutcomes.SuccessfulPlanningOutcome;
 import finitestatemachine.Action;
 import finitestatemachine.State;
-import finitestatemachine.impl.StringStateImpl;
-import markov.impl.PairImpl;
 import obstaclemaps.MapDisplayer;
 import obstaclemaps.ObstacleMap;
 import obstaclemaps.Path;
 
 public class AssignmentGlobalStructure {
 
-    //TODO: Fix bug that requires all lines in the read file to be the same length
-    private enum PathPlanningAction implements Action {
+    public enum PathPlanningAction implements Action {
         UP, DOWN, LEFT, RIGHT, HALT
     }
 
-    public static void main(String[] args) {
+    public static void  main(String[] args) {
         /**
          * First step of the processing pipeline: sensing
          * This step provides the decision system with the right information about the environment.
@@ -63,15 +54,20 @@ public class AssignmentGlobalStructure {
 
         WorldModel<State, Action> wm = generateWorldModel(om, goal);
 
+        List<Action> BFSActions = Solver.bfs(wm, startState, goalState);
+        Path BFSp = planToPath(BFSActions, start);
+        md.setPath(BFSp);
+        System.out.println(BFSp);
 
-        Stack<Action> actions = Solver.resolve(wm, startState, goalState);
+        // DFS
+        /*Stack<Action> actions = Solver.resolve(wm, startState, goalState);
         Path p = planToPath(actions, start);
         md.setPath(p);
         if (p.getDirections().isEmpty()) {
             System.out.println("No path could be found.");
         } else {
             System.out.println(p);
-        }
+        }*/
 
 
         /**
@@ -81,6 +77,25 @@ public class AssignmentGlobalStructure {
          */
     }
 
+    // For BFS
+    private static Path planToPath(List<Action> actions, Point startingPoint) {
+        List<Path.Direction> directions = new ArrayList<>();
+        for (Action action : actions) {
+            directions.add(switch ((PathPlanningAction) action) {
+                        case DOWN -> Path.Direction.SOUTH;
+                        case UP -> Path.Direction.NORTH;
+                        case LEFT -> Path.Direction.WEST;
+                        case RIGHT -> Path.Direction.EAST;
+                        case HALT -> null;
+                    });
+        }
+
+
+        return new Path(startingPoint, directions);
+    }
+
+
+    // For DFS
     private static Path planToPath(Stack<Action> actions, Point startingPoint) {
         List<Path.Direction> directions = new ArrayList<>();
         while (!actions.empty()) {
