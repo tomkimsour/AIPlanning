@@ -11,6 +11,7 @@ import java.util.function.Function;
 
 import deterministicplanning.models.FunctionBasedDeterministicWorldModel;
 import deterministicplanning.models.WorldModel;
+import deterministicplanning.solvers.Planning;
 import finitestatemachine.Action;
 import finitestatemachine.State;
 import obstaclemaps.MapDisplayer;
@@ -20,7 +21,7 @@ import obstaclemaps.Path;
 public class AssignmentGlobalStructure {
 
     public enum PathPlanningAction implements Action {
-        UP, DOWN, LEFT, RIGHT, HALT
+        UP, DOWN, LEFT, RIGHT
     }
 
     public static void  main(String[] args) {
@@ -54,10 +55,24 @@ public class AssignmentGlobalStructure {
 
         WorldModel<State, Action> wm = generateWorldModel(om, goal);
 
-        List<Action> BFSActions = Solver.bfs(wm, startState, goalState);
-        Path BFSp = planToPath(BFSActions, start);
-        md.setPath(BFSp);
-        System.out.println(BFSp);
+        long startTime = System.nanoTime();
+        Stack<Action> actions = Solver.BFS(wm, startState, goalState);
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime) / 1000000;
+        System.out.println("Time for BFS-Solver: " + duration + "ms");
+        Path p = planToPath(actions, start);
+        md.setPath(p);
+        System.out.println(p);
+
+        startTime = System.nanoTime();
+        Planning.resolve(wm, startState, goalState, 1000);
+        endTime = System.nanoTime();
+        duration = (endTime - startTime) / 1000000;
+        System.out.println("Time for Default Solver: " + duration + "ms");
+        //List<Action> BFSActions = Solver.bfs(wm, startState, goalState);
+        //Path BFSp = planToPath(BFSActions, start);
+        //md.setPath(BFSp);
+        //System.out.println(BFSp);
 
         // DFS
         /*Stack<Action> actions = Solver.resolve(wm, startState, goalState);
@@ -86,7 +101,6 @@ public class AssignmentGlobalStructure {
                         case UP -> Path.Direction.NORTH;
                         case LEFT -> Path.Direction.WEST;
                         case RIGHT -> Path.Direction.EAST;
-                        case HALT -> null;
                     });
         }
 
@@ -104,7 +118,6 @@ public class AssignmentGlobalStructure {
                 case UP -> Path.Direction.NORTH;
                 case LEFT -> Path.Direction.WEST;
                 case RIGHT -> Path.Direction.EAST;
-                case HALT -> null;
             });
         }
 
@@ -202,7 +215,6 @@ public class AssignmentGlobalStructure {
                 state -> {
                     PathPlanningState state_ = (PathPlanningState) state;
                     Set<Action> actions = new HashSet<>();
-                    actions.add(PathPlanningAction.HALT);
 
                     Set<Point> obstaclePositions = om.getObstacles();
 
