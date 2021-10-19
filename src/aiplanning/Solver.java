@@ -42,7 +42,6 @@ public class Solver {
         Stack<Action> actions = new Stack<>();
         actions.push(getActionForTransition(pointer, goalState));
         while (!pointer.equals(startingState)) {
-            System.out.println("Pointer: " + pointer);
             State parent = states.get(pointer);
             Action fromParentToState = getActionForTransition(parent, pointer);
             actions.push(fromParentToState);

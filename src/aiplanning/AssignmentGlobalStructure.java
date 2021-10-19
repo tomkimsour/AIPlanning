@@ -55,20 +55,13 @@ public class AssignmentGlobalStructure {
 
         WorldModel<State, Action> wm = generateWorldModel(om, goal);
 
-        long startTime = System.nanoTime();
+
         Stack<Action> actions = Solver.BFS(wm, startState, goalState);
-        long endTime = System.nanoTime();
-        long duration = (endTime - startTime) / 1000000;
-        System.out.println("Time for BFS-Solver: " + duration + "ms");
         Path p = planToPath(actions, start);
         md.setPath(p);
         System.out.println(p);
 
-        startTime = System.nanoTime();
         Planning.resolve(wm, startState, goalState, 1000);
-        endTime = System.nanoTime();
-        duration = (endTime - startTime) / 1000000;
-        System.out.println("Time for Default Solver: " + duration + "ms");
         //List<Action> BFSActions = Solver.bfs(wm, startState, goalState);
         //Path BFSp = planToPath(BFSActions, start);
         //md.setPath(BFSp);
