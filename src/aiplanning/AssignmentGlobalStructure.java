@@ -10,10 +10,15 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import deterministicplanning.models.FunctionBasedDeterministicWorldModel;
+import deterministicplanning.models.Plan;
 import deterministicplanning.models.WorldModel;
 import deterministicplanning.solvers.Planning;
+import deterministicplanning.solvers.planningoutcomes.FailedPlanningOutcome;
+import deterministicplanning.solvers.planningoutcomes.PlanningOutcome;
+import deterministicplanning.solvers.planningoutcomes.SuccessfulPlanningOutcome;
 import finitestatemachine.Action;
 import finitestatemachine.State;
+import markov.impl.PairImpl;
 import obstaclemaps.MapDisplayer;
 import obstaclemaps.ObstacleMap;
 import obstaclemaps.Path;
@@ -24,7 +29,7 @@ public class AssignmentGlobalStructure {
         UP, DOWN, LEFT, RIGHT
     }
 
-    public static void  main(String[] args) {
+    public static void main(String[] args) {
         /**
          * First step of the processing pipeline: sensing
          * This step provides the decision system with the right information about the environment.
@@ -33,7 +38,6 @@ public class AssignmentGlobalStructure {
 
 
         File inputFile = Paths.get(args[0]).toFile();
-        FileFormatter.formatFile(inputFile);
         Point start = getStart(inputFile);
         Point goal = getEnd(inputFile);
         ObstacleMap om = generateObstacleMap(inputFile);
@@ -55,13 +59,26 @@ public class AssignmentGlobalStructure {
 
         WorldModel<State, Action> wm = generateWorldModel(om, goal);
 
+        // Currently, results in the path produced in reverse order
+        try {
+            Stack<Action> actions = Solver.BFS(wm, startState, goalState);
+            Path p = planToPath(actions, start);
+            md.setPath(p);
+            System.out.println(p);
+        } catch (Exception e) {
+            System.out.println("No plan could be found.");
+        }
 
-        Stack<Action> actions = Solver.BFS(wm, startState, goalState);
-        Path p = planToPath(actions, start);
-        md.setPath(p);
-        System.out.println(p);
-
-        Planning.resolve(wm, startState, goalState, 1000);
+        /*
+        PlanningOutcome po = Planning.resolve(wm, startState, goalState, 200);
+        if (po instanceof FailedPlanningOutcome) {
+            System.out.println("No plan could be found.");
+        } else {
+            Plan<State, Action> plan = ((SuccessfulPlanningOutcome) po).getPlan();
+            Path p = planToPath(plan);
+            md.setPath(p);
+            System.out.println(p);
+        }*/
         //List<Action> BFSActions = Solver.bfs(wm, startState, goalState);
         //Path BFSp = planToPath(BFSActions, start);
         //md.setPath(BFSp);
@@ -86,27 +103,11 @@ public class AssignmentGlobalStructure {
     }
 
     // For BFS
-    private static Path planToPath(List<Action> actions, Point startingPoint) {
-        List<Path.Direction> directions = new ArrayList<>();
-        for (Action action : actions) {
-            directions.add(switch ((PathPlanningAction) action) {
-                        case DOWN -> Path.Direction.SOUTH;
-                        case UP -> Path.Direction.NORTH;
-                        case LEFT -> Path.Direction.WEST;
-                        case RIGHT -> Path.Direction.EAST;
-                    });
-        }
-
-
-        return new Path(startingPoint, directions);
-    }
-
-
-    // For DFS
     private static Path planToPath(Stack<Action> actions, Point startingPoint) {
         List<Path.Direction> directions = new ArrayList<>();
-        while (!actions.empty()) {
-            directions.add(switch ((PathPlanningAction)actions.pop()) {
+        while (!actions.isEmpty()) {
+            Action current = actions.pop();
+            directions.add(switch ((PathPlanningAction) current) {
                 case DOWN -> Path.Direction.SOUTH;
                 case UP -> Path.Direction.NORTH;
                 case LEFT -> Path.Direction.WEST;
@@ -114,9 +115,9 @@ public class AssignmentGlobalStructure {
             });
         }
 
-
         return new Path(startingPoint, directions);
     }
+
 
     private static State toState(Point start) {
         return new PathPlanningState(start);
@@ -233,10 +234,10 @@ public class AssignmentGlobalStructure {
 
 
             return switch (a.toString()) {
-                case "RIGHT" -> new PathPlanningState(state_.x + 1, state_.y);
-                case "LEFT" -> new PathPlanningState(state_.x - 1, state_.y);
-                case "DOWN" -> new PathPlanningState(state_.x, state_.y + 1);
-                case "UP" -> new PathPlanningState(state_.x, state_.y - 1);
+                case "RIGHT" -> new PathPlanningState((byte) (state_.x + 1), state_.y);
+                case "LEFT" -> new PathPlanningState((byte) (state_.x - 1), state_.y);
+                case "DOWN" -> new PathPlanningState(state_.x, (byte) (state_.y + 1));
+                case "UP" -> new PathPlanningState(state_.x, (byte) (state_.y - 1));
                 default -> s;
             };
         };
@@ -246,7 +247,7 @@ public class AssignmentGlobalStructure {
         for (int row = 0; row < om.getHeight() - 1; row++) {
             for (int col = 0; col < om.getWidth(); col++) {
                 if (!om.getObstacles().contains(new Point(col, row))) {
-                    states.add(new PathPlanningState(col, row));
+                    states.add(new PathPlanningState((byte) col, (byte) row));
                 }
             }
         }
@@ -254,7 +255,7 @@ public class AssignmentGlobalStructure {
         // Need a suitable reward function
         // Should all moves just have reward -1 so that as few moves as possible is recommended?
         BiFunction<State, Action, Double> reward = (s, a) -> {
-            if (new PathPlanningState(goal.x, goal.y).equals(s)) {
+            if (new PathPlanningState((byte) goal.x, (byte) goal.y).equals(s)) {
                 return 1.0;
             }
             return -1.0;

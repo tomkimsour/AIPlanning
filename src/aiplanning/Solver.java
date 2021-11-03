@@ -36,19 +36,25 @@ public class Solver {
         throw new IllegalArgumentException("No connecting action found for given states: " + from + " -> " + to);
     }
 
+    // With stack, this is giving a solution in reverse order, trying queue
+    // That also produced a backwards solution
     public static <S extends State, A extends Action> Stack<Action> BFS(WorldModel<State, Action> wm, S startingState, S goalState) {
-        Map<State, State> states = BFSHelper(wm, startingState, goalState);
-        State pointer = states.get(goalState);
-        Stack<Action> actions = new Stack<>();
-        actions.push(getActionForTransition(pointer, goalState));
-        while (!pointer.equals(startingState)) {
-            State parent = states.get(pointer);
-            Action fromParentToState = getActionForTransition(parent, pointer);
-            actions.push(fromParentToState);
-            pointer = parent;
-        }
+        try {
+            Map<State, State> states = BFSHelper(wm, startingState, goalState);
+            State pointer = states.get(goalState);
+            Stack<Action> actions = new Stack<>();
+            actions.add(getActionForTransition(pointer, goalState));
+            while (!pointer.equals(startingState)) {
+                State parent = states.get(pointer);
+                Action fromParentToState = getActionForTransition(parent, pointer);
+                actions.add(fromParentToState);
+                pointer = parent;
+            }
 
-        return actions;
+            return actions;
+        } catch (IllegalStateException e) {
+            throw e;
+        }
     }
 
     public static <S extends State, A extends Action> Map<State, State> BFSHelper(WorldModel<State, Action> wm, S startingState, S goalState) {

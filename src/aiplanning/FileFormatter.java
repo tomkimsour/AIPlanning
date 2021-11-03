@@ -5,7 +5,7 @@ import java.nio.file.Files;
 import java.util.List;
 
 public class FileFormatter {
-    public static void formatFile(File inputFile) {
+    public static File formatFile(File inputFile) {
         int maxLength = getMaxLineLength(inputFile);
         try {
             List<String> lines = Files.readAllLines(inputFile.toPath());
@@ -18,6 +18,7 @@ public class FileFormatter {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return inputFile;
     }
 
     private static int getMaxLineLength(File inputFile) {

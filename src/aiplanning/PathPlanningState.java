@@ -7,15 +7,15 @@ import java.util.Objects;
 
 // For the path-planning, the state should probably only be the position of the player
 public class PathPlanningState implements State {
-    int x;
-    int y;
+    byte x;
+    byte y;
 
     public PathPlanningState(Point point) {
-        this.x = point.x;
-        this.y = point.y;
+        this.x = (byte) point.x;
+        this.y = (byte) point.y;
     }
 
-    public PathPlanningState(int x, int y) {
+    public PathPlanningState(byte x, byte y) {
         this.x = x;
         this.y = y;
     }
